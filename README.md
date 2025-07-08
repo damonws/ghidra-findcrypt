@@ -1,38 +1,14 @@
 # Ghidra FindCrypt
-![Bug eyed Ghidra looks at complex algorithms](docs/findcrypt_logo.png)
 
-[![Github status](https://github.com/TorgoTorgo/ghidra-findcrypt/actions/workflows/main.yml/badge.svg)](https://github.com/TorgoTorgo/ghidra-findcrypt/actions/workflows/main.yml)
-[![Gitlab status](https://gitlab.com/Torgo/ghidra_findcrypt/badges/master/pipeline.svg)](https://gitlab.com/Torgo/ghidra_findcrypt/pipelines/master/latest)
-
-This is a re-write of another [Ghidra FindCrypt](https://github.com/d3v1l401/FindCrypt-Ghidra/) script
-as an auto analysis module. It also takes better advantage of the Ghidra
-API to label found constants.
+Find cryptographic constants with Ghidra.
 
 ## Building
 
-FindCrypt builds like a standard Ghidra module:
-
-```bash
-cd FindCrypt
-GHIDRA_INSTALL_DIR=/path/to/Ghidra_PUBLIC... gradle
-```
-
-This will output a zip in the `FindCrypt/dist/` directory.
-
-Note: Ghidra FindCrypt no longer supports Ghidra versions prior to 9.2 as they
-lack the Gson JSON library.
+TODO
 
 ## Installing
 
-You can either build it yourself (see above) or download
-a zip from the [Github releases](https://github.com/TorgoTorgo/ghidra-findcrypt/releases) or [GitLab releases](https://gitlab.com/Torgo/ghidra_findcrypt/-/releases)
-
-The extension can be installed into Ghidra like so:
-- Extract the zip if downloaded from the release page
-- From the Project window hit `File` -> `Install extensions...`
-- Click the green plus icon on the top right
-- In the file browser that opens, select the zip. In case of the released zip the final zip is inside  `FindCrypt/dist.
-- Click OK and restart Ghidra
+TODO
 
 ## Using
 
@@ -52,4 +28,3 @@ take precedence.
 
 A comment is always placed when a crypt constant is found to tell you the type
 and the size of the constant, just in case the datatype wasn't applied.
-

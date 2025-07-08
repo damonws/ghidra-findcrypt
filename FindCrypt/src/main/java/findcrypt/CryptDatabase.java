@@ -34,11 +34,11 @@ public class CryptDatabase {
 		}.getType());
 		loadedSignatures.forEach(signature -> addSignature(signature.getName(), signature.getHexBytes()));
 	}
-	
+
 	public ArrayList<CryptSignature> getSignatures() {
 		return this.signatures;
 	}
-	
+
 	public void addSignature(String name, String hexString) {
 		CryptSignature sig = new CryptSignature(name, hexString);
 		this.signatures.add(sig);

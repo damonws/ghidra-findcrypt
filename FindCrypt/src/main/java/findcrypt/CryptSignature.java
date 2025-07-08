@@ -15,11 +15,11 @@ public class CryptSignature {
 		this.hexBytes = hexBytes;
 		this.data = hexStringToByteArray(this.hexBytes);
 	}
-	
+
 	public byte[] getBytes() {
 		return this.data;
 	}
-	
+
 	public String getName() {
 		return this.name;
 	}

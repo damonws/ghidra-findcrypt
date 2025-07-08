@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -41,7 +41,7 @@ import ghidra.util.task.TaskMonitor;
  * This analyzer searches through program bytes to locate cryptographic constants and labels them.
  */
 public class FindCryptAnalyzer extends AbstractAnalyzer {
-	
+
 	private CryptDatabase database;
 
 	public FindCryptAnalyzer() {
@@ -64,7 +64,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 	@Override
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log)
 			throws CancelledException {
-		
+
 		// If the database hasn't yet been opened, we'll open it
 		if (this.database == null) {
 			try {
@@ -82,28 +82,28 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 
 		for (CryptSignature signature : database.getSignatures()) {
 			monitor.checkCanceled();
-			
+
 			// We'll start searching from the top of the newly added address range
 			Address search_from = set.getMinAddress();
-			
+
 			while (search_from != null) {
 				monitor.checkCanceled();
-				
+
 				// Starting at min_address, find the next occurrence of the bytes from the signature
 				Address found_addr = program.getMemory().findBytes(search_from,
 						signature.getBytes(), null, true, monitor);
-				
+
 				if (found_addr != null) {
 					Msg.info(this, String.format("Labelled %s @ %s - %d bytes", signature.getName(),
 							found_addr.toString(), signature.getBytes().length));
 					try {
 						// Add a symbol
 						program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(), SourceType.ANALYSIS);
-						
+
 						// Add a comment
 						program.getListing().setComment(found_addr, 0, String.format("Crypt constant %s - %d bytes",
 								signature.getName(), signature.getBytes().length));
-						
+
 						// Try to create an array
 						ArrayDataType dt = new ArrayDataType(new ByteDataType(), signature.getBytes().length, 1);
 						try {
@@ -111,7 +111,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 						} catch (InvalidNameException e) {
 							Msg.error(this, "Failed to name datatype " + "CRYPT_" + signature.getName(), e);
 						}
-						
+
 						try {
 							program.getListing().createData(found_addr, dt);
 						} catch (CodeUnitInsertionException e) {
@@ -119,12 +119,12 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 							// If that's the case, we probably don't want to overwrite it...
 							Msg.warn(this, "Could not apply datatype for crypt constant", e);
 						}
-						
+
 					} catch (InvalidInputException e) {
 						log.appendException(e);
 						return false;
 					}
-					
+
 					// Now we search from the address after
 					search_from = found_addr.next();
 				} else {
@@ -133,10 +133,10 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 				}
 			}
 		}
-		
+
 		return true;
 	}
-	
+
 	@Override
 	public void analysisEnded(Program program) {
 		// Drop the database and end the analysis
