@@ -28,6 +28,7 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.ArrayDataType;
 import ghidra.program.model.data.ByteDataType;
+import ghidra.program.model.listing.CommentType;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
@@ -81,13 +82,13 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 		}
 
 		for (CryptSignature signature : database.getSignatures()) {
-			monitor.checkCanceled();
+			monitor.checkCancelled();
 
 			// We'll start searching from the top of the newly added address range
 			Address search_from = set.getMinAddress();
 
 			while (search_from != null) {
-				monitor.checkCanceled();
+				monitor.checkCancelled();
 
 				// Starting at min_address, find the next occurrence of the bytes from the signature
 				Address found_addr = program.getMemory().findBytes(search_from,
@@ -101,7 +102,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 						program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(), SourceType.ANALYSIS);
 
 						// Add a comment
-						program.getListing().setComment(found_addr, 0, String.format("Crypt constant %s - %d bytes",
+						program.getListing().setComment(found_addr, CommentType.PRE, String.format("Crypt constant %s - %d bytes",
 								signature.getName(), signature.getBytes().length));
 
 						// Try to create an array
