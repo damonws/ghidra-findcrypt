@@ -2,13 +2,10 @@
 
 Find cryptographic constants with Ghidra.
 
-## Building
-
-TODO
-
 ## Installing
 
-TODO
+Follow the instructions in the Extensions section of Ghidra's GettingStarted
+document.
 
 ## Using
 
