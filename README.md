@@ -2,6 +2,14 @@
 
 Find cryptographic constants with Ghidra.
 
+## Building
+
+Requires Ghidra 11.0+
+
+```shell
+gradle -PGHIDRA_INSTALL_DIR="<ghidra-install-dir>"
+```
+
 ## Installing
 
 Follow the instructions in the Extensions section of Ghidra's GettingStarted

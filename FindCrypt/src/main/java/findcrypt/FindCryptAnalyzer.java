@@ -28,7 +28,6 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.ArrayDataType;
 import ghidra.program.model.data.ByteDataType;
-import ghidra.program.model.listing.CommentType;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
@@ -102,7 +101,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 						program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(), SourceType.ANALYSIS);
 
 						// Add a comment
-						program.getListing().setComment(found_addr, CommentType.PRE, String.format("Crypt constant %s - %d bytes",
+						program.getListing().setComment(found_addr, 1, String.format("Crypt constant %s - %d bytes",
 								signature.getName(), signature.getBytes().length));
 
 						// Try to create an array
