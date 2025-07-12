@@ -4,7 +4,11 @@ Find cryptographic constants with Ghidra.
 
 ## Building
 
-Requires Ghidra 11.0+
+| Branch            | Ghidra Versions |
+| ----------------- | --------------- |
+| `main`            | latest          |
+| `min_ghidra_11_0` | 11.0 to 11.3.2  |
+| `min_ghidra_11_4` | 11.4 to latest  |
 
 ```shell
 gradle -PGHIDRA_INSTALL_DIR="<ghidra-install-dir>"
