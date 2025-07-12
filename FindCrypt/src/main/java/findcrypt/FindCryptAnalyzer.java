@@ -38,7 +38,8 @@ import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 
 /**
- * This analyzer searches through program bytes to locate cryptographic constants and labels them.
+ * This analyzer searches through program bytes to locate cryptographic
+ * constants and labels them.
  */
 public class FindCryptAnalyzer extends AbstractAnalyzer {
 
@@ -89,25 +90,30 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			while (search_from != null) {
 				monitor.checkCancelled();
 
-				// Starting at min_address, find the next occurrence of the bytes from the signature
-				Address found_addr = program.getMemory().findBytes(search_from,
-						signature.getBytes(), null, true, monitor);
+				// Starting at min_address, find the next occurrence of the bytes from the
+				// signature
+				Address found_addr = program.getMemory().findBytes(search_from, signature.getBytes(), null, true,
+						monitor);
 
 				if (found_addr != null) {
 					Msg.info(this, String.format("Labelled %s @ %s - %d bytes", signature.getName(),
 							found_addr.toString(), signature.getBytes().length));
 					try {
 						// Add a symbol
-						program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(), SourceType.ANALYSIS);
+						program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(),
+								SourceType.ANALYSIS);
 
 						// Add a comment
+						// use of int for the comment type parameter is deprecated starting with 11.4,
+						// but the new data type, CommentType, isn't available until 11.4, so for builds
+						// with earlier versions we still have to use an int. 1 is a PRE comment.
 						program.getListing().setComment(found_addr, 1, String.format("Crypt constant %s - %d bytes",
 								signature.getName(), signature.getBytes().length));
 
 						// Try to create an array
 						ArrayDataType dt = new ArrayDataType(new ByteDataType(), signature.getBytes().length, 1);
 						try {
-							dt.setName("CRYPT_"+ signature.getName());
+							dt.setName("CRYPT_" + signature.getName());
 						} catch (InvalidNameException e) {
 							Msg.error(this, "Failed to name datatype " + "CRYPT_" + signature.getName(), e);
 						}
