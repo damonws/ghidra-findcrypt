@@ -105,10 +105,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 								SourceType.ANALYSIS);
 
 						// Add a comment
-						// comment type parameter: new data type starting with 11.4 -- use of 'int' here
-						// is deprecated
-						program.getListing().setComment(found_addr, CommentType.PRE, String.format(
-								"Crypt constant %s - %d bytes", signature.getName(), signature.getBytes().length));
+						addComment(program, signature, found_addr);
 
 						// Try to create an array
 						ArrayDataType dt = new ArrayDataType(new ByteDataType(), signature.getBytes().length, 1);
@@ -141,6 +138,18 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 		}
 
 		return true;
+	}
+
+	private void addComment(Program program, CryptSignature signature, Address found_addr) {
+		// comment type parameter: new data type starting with 11.4; 'int' is deprecated
+		String comment = program.getListing().getComment(CommentType.PRE, found_addr);
+		if (comment == null) {
+			comment = "";
+		} else {
+			comment += System.lineSeparator();
+		}
+		program.getListing().setComment(found_addr, CommentType.PRE, comment
+				+ String.format("Crypt constant %s - %d bytes", signature.getName(), signature.getBytes().length));
 	}
 
 	@Override
