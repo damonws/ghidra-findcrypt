@@ -9,8 +9,8 @@ import com.google.gson.reflect.TypeToken;
 import ghidra.util.Msg;
 
 /**
- * A simple data structure that deserializes {@link CryptSignature}
- * objects from a file.
+ * A simple data structure that deserializes {@link CryptSignature} objects from
+ * a file.
  *
  * @author torgo
  */
@@ -23,8 +23,9 @@ public class CryptDatabase {
 
 	public void parse(Reader reader) {
 		Gson gson = new Gson();
-		final ArrayList<CryptSignature> loadedSignatures = gson.fromJson(reader, new TypeToken<ArrayList<CryptSignature>>() {
-		}.getType());
+		final ArrayList<CryptSignature> loadedSignatures = gson.fromJson(reader,
+				new TypeToken<ArrayList<CryptSignature>>() {
+				}.getType());
 		loadedSignatures.forEach(signature -> addSignature(signature.getName(), signature.getHexBytes()));
 	}
 
@@ -32,7 +33,11 @@ public class CryptDatabase {
 		return this.signatures;
 	}
 
-	public void addSignature(String name, String hexString) {
+	public int getNumSignatures() {
+		return this.signatures.size();
+	}
+
+	private void addSignature(String name, String hexString) {
 		CryptSignature sig = new CryptSignature(name, hexString);
 		this.signatures.add(sig);
 		Msg.debug(this, String.format("Added signature: %s", sig.getName()));

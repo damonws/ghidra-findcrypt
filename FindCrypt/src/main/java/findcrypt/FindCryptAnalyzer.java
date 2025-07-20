@@ -68,6 +68,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			throws CancelledException {
 
 		// If the database hasn't yet been opened, we'll open it
+		monitor.setMessage(super.getName() + ": loading database");
 		if (this.database == null) {
 			try {
 				this.database = new CryptDatabase();
@@ -82,8 +83,12 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			}
 		}
 
+		// set up monitor for meaningful feedback
+		monitor.initialize(database.getNumSignatures());
+		monitor.setMessage(super.getName() + ": identify signatures");
 		for (CryptSignature signature : database.getSignatures()) {
 			monitor.checkCancelled();
+			monitor.incrementProgress();
 
 			// We'll start searching from the top of the newly added address range
 			Address search_from = set.getMinAddress();
@@ -93,8 +98,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 
 				// Starting at min_address, find the next occurrence of the bytes from the
 				// signature
-				Address found_addr = program.getMemory().findBytes(search_from, signature.getBytes(), null, true,
-						monitor);
+				Address found_addr = program.getMemory().findBytes(search_from, signature.getBytes(), null, true, null);
 
 				if (found_addr != null) {
 					Msg.info(this, String.format("Labelled %s @ %s - %d bytes", signature.getName(),
@@ -120,7 +124,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 						} catch (CodeUnitInsertionException e) {
 							// We failed to attach the datatype, this is probably due to existing data
 							// If that's the case, we probably don't want to overwrite it...
-							Msg.warn(this, "Could not apply datatype for crypt constant", e);
+							Msg.warn(this, "Could not apply datatype for crypt constant:" + e.getMessage());
 						}
 
 					} catch (InvalidInputException e) {
