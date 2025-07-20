@@ -97,47 +97,50 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 				monitor.checkCancelled();
 
 				// Starting at min_address, find the next occurrence of the bytes from the
-				// signature
+				// signature; for large signatures, start by searching for prefix
+				if (signature.isLarge()) {
+					search_from = program.getMemory().findBytes(search_from, signature.getPrefixBytes(), null, true,
+							null);
+					if (search_from == null)
+						break;
+				}
 				Address found_addr = program.getMemory().findBytes(search_from, signature.getBytes(), null, true, null);
+				if (found_addr == null)
+					break;
 
-				if (found_addr != null) {
-					Msg.info(this, String.format("Labelled %s @ %s - %d bytes", signature.getName(),
-							found_addr.toString(), signature.getBytes().length));
+				Msg.info(this, String.format("Labelled %s @ %s - %d bytes", signature.getName(), found_addr.toString(),
+						signature.getBytes().length));
+				try {
+					// Add a symbol
+					program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(),
+							SourceType.ANALYSIS);
+
+					// Add a comment
+					addComment(program, signature, found_addr);
+
+					// Try to create an array
+					ArrayDataType dt = new ArrayDataType(new ByteDataType(), signature.getBytes().length, 1);
 					try {
-						// Add a symbol
-						program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(),
-								SourceType.ANALYSIS);
-
-						// Add a comment
-						addComment(program, signature, found_addr);
-
-						// Try to create an array
-						ArrayDataType dt = new ArrayDataType(new ByteDataType(), signature.getBytes().length, 1);
-						try {
-							dt.setName("CRYPT_" + signature.getName());
-						} catch (InvalidNameException e) {
-							Msg.error(this, "Failed to name datatype " + "CRYPT_" + signature.getName(), e);
-						}
-
-						try {
-							program.getListing().createData(found_addr, dt);
-						} catch (CodeUnitInsertionException e) {
-							// We failed to attach the datatype, this is probably due to existing data
-							// If that's the case, we probably don't want to overwrite it...
-							Msg.warn(this, "Could not apply datatype for crypt constant:" + e.getMessage());
-						}
-
-					} catch (InvalidInputException e) {
-						log.appendException(e);
-						return false;
+						dt.setName("CRYPT_" + signature.getName());
+					} catch (InvalidNameException e) {
+						Msg.error(this, "Failed to name datatype " + "CRYPT_" + signature.getName(), e);
 					}
 
-					// Now we search from the address after
-					search_from = found_addr.next();
-				} else {
-					// We didn't find anything... break
-					search_from = null;
+					try {
+						program.getListing().createData(found_addr, dt);
+					} catch (CodeUnitInsertionException e) {
+						// We failed to attach the datatype, this is probably due to existing data
+						// If that's the case, we probably don't want to overwrite it...
+						Msg.warn(this, "Could not apply datatype for crypt constant:" + e.getMessage());
+					}
+
+				} catch (InvalidInputException e) {
+					log.appendException(e);
+					return false;
 				}
+
+				// Now we search from the address after
+				search_from = found_addr.next();
 			}
 		}
 
