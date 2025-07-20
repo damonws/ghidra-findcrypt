@@ -388,31 +388,71 @@
     "hexBytes":"97EF45AC290F43CD457E1B551C801134B177CE962E728E7C5F5AAB0A3643BE189D21B421BC87B94DA29D27BDC75BD7C3"
   },
   {
-    "name":"PKCS_DigestDecoration_MD2",
+    "name":"PKCS_DER_MD2",
     "hexBytes":"3020300C06082A864886F70D020205000410"
   },
   {
-    "name":"PKCS_DigestDecoration_MD5",
+    "name":"PKCS_DER_MD4",
+    "hexBytes":"3020300c06082a864886f70d020305000410"
+  },
+  {
+    "name":"PKCS_DER_MD5",
     "hexBytes":"3020300C06082A864886F70D020505000410"
   },
   {
-    "name":"PKCS_DigestDecoration_RIPEMD160",
+    "name":"PKCS_DER_MDC2",
+    "hexBytes":"301c300806045508036505000410"
+  },
+  {
+    "name":"PKCS_DER_RIPEMD160",
     "hexBytes":"3021300906052B2403020105000414"
   },
   {
-    "name":"PKCS_DigestDecoration_SHA256",
+    "name":"PKCS_DER_SHA1",
+    "hexBytes":"3021300906052b0e03021a05000414"
+  },
+  {
+    "name":"PKCS_DER_SHA224",
+    "hexBytes":"302d300d06096086480165030402040500041c"
+  },
+  {
+    "name":"PKCS_DER_SHA256",
     "hexBytes":"3031300D060960864801650304020105000420"
   },
   {
-    "name":"PKCS_DigestDecoration_SHA384",
+    "name":"PKCS_DER_SHA384",
     "hexBytes":"3041300D060960864801650304020205000430"
   },
   {
-    "name":"PKCS_DigestDecoration_SHA512",
+    "name":"PKCS_DER_SHA512",
     "hexBytes":"3051300D060960864801650304020305000440"
   },
   {
-    "name":"PKCS_DigestDecoration_Tiger",
+    "name":"PKCS_DER_SHA512_224",
+    "hexBytes":"302d300d06096086480165030402050500041c"
+  },
+  {
+    "name":"PKCS_DER_SHA512_256",
+    "hexBytes":"3031300d060960864801650304020605000420"
+  },
+  {
+    "name":"PKCS_DER_SHA3_224",
+    "hexBytes":"302d300d06096086480165030402070500041c"
+  },
+  {
+    "name":"PKCS_DER_SHA3_256",
+    "hexBytes":"3031300d060960864801650304020805000420"
+  },
+  {
+    "name":"PKCS_DER_SHA3_384",
+    "hexBytes":"3041300d060960864801650304020905000430"
+  },
+  {
+    "name":"PKCS_DER_SHA3_512",
+    "hexBytes":"3051300d060960864801650304020a05000440"
+  },
+  {
+    "name":"PKCS_DER_Tiger",
     "hexBytes":"3029300D06092B06010401DA470C0205000418"
   },
   {
