@@ -9,41 +9,49 @@ import java.util.Arrays;
  */
 public class CryptSignature {
 	private final String name;
+	private final String comment;
+	private final String hexBytes;
 	private transient final byte[] data;
 	private transient final byte[] prefix;
-	private final String hexBytes;
-	
+
 	private static final int PREFIX_SIZE = 8;
 
-	public CryptSignature(String name, String hexBytes) {
+	public CryptSignature(String name, String comment, String hexBytes) {
 		this.name = name;
+		this.comment = comment;
 		this.hexBytes = hexBytes;
-		this.data = hexStringToByteArray(this.hexBytes);
-		if (this.data.length > PREFIX_SIZE) {
-			this.prefix = Arrays.copyOfRange(this.data, 0, PREFIX_SIZE); 
+		data = hexStringToByteArray(this.hexBytes);
+		if (data.length > PREFIX_SIZE) {
+			prefix = Arrays.copyOfRange(data, 0, PREFIX_SIZE);
 		} else {
-			this.prefix = null;
+			prefix = null;
 		}
 	}
 
 	public byte[] getBytes() {
-		return this.data;
+		return data;
 	}
-	
+
 	public byte[] getPrefixBytes() {
-		return this.prefix; 
+		return prefix;
 	}
 
 	public boolean isLarge() {
-		return this.prefix != null;
+		return prefix != null;
 	}
 
 	public String getName() {
-		return this.name;
+		return name;
+	}
+
+	public String getComment() {
+		if (comment == null)
+			return "";
+		return comment;
 	}
 
 	public String getHexBytes() {
-		return this.hexBytes;
+		return hexBytes;
 	}
 
 	private static byte[] hexStringToByteArray(String s) {

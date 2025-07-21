@@ -155,8 +155,11 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 		} else {
 			comment += System.lineSeparator();
 		}
-		program.getListing().setComment(found_addr, CommentType.PRE, comment
-				+ String.format("Crypt constant %s - %d bytes", signature.getName(), signature.getBytes().length));
+		comment += String.format("Crypt constant %s - %d bytes", signature.getName(), signature.getBytes().length); 
+		if (signature.getComment().length() > 0) {
+			comment += "\n" + signature.getComment();
+		}
+		program.getListing().setComment(found_addr, CommentType.PRE, comment);
 	}
 
 	@Override

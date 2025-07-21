@@ -26,7 +26,8 @@ public class CryptDatabase {
 		final ArrayList<CryptSignature> loadedSignatures = gson.fromJson(reader,
 				new TypeToken<ArrayList<CryptSignature>>() {
 				}.getType());
-		loadedSignatures.forEach(signature -> addSignature(signature.getName(), signature.getHexBytes()));
+		loadedSignatures.forEach(
+				signature -> addSignature(signature.getName(), signature.getComment(), signature.getHexBytes()));
 	}
 
 	public ArrayList<CryptSignature> getSignatures() {
@@ -37,8 +38,8 @@ public class CryptDatabase {
 		return this.signatures.size();
 	}
 
-	private void addSignature(String name, String hexString) {
-		CryptSignature sig = new CryptSignature(name, hexString);
+	private void addSignature(String name, String comment, String hexString) {
+		CryptSignature sig = new CryptSignature(name, comment, hexString);
 		this.signatures.add(sig);
 		Msg.debug(this, String.format("Added signature: %s", sig.getName()));
 	}
