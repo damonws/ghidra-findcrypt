@@ -68,6 +68,8 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 	@Override
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log)
 			throws CancelledException {
+		int uniqSigCount = 0;
+		int totalSigCount = 0;
 
 		// If the database hasn't yet been opened, we'll open it
 		monitor.setMessage(getName() + ": loading database");
@@ -91,6 +93,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 		monitor.initialize(database.getNumSignatures());
 		monitor.setMessage(getName() + ": identify signatures");
 		for (CryptSignature signature : database.getSignatures()) {
+			boolean found = false;
 			monitor.incrementProgress();
 
 			// We'll start searching from the top of the newly added address range
@@ -113,6 +116,8 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 				}
 
 				// found a signature, add it to the set at this address
+				found = true;
+				totalSigCount++;
 				Set<CryptSignature> sigSet = cryptMap.get(foundAddr);
 				if (sigSet == null) {
 					sigSet = new TreeSet<>();
@@ -123,6 +128,8 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 				// set start point for next search
 				search_from = foundAddr.next();
 			}
+			if (found)
+				uniqSigCount++;
 		}
 
 		// apply markup for the signatures that were found
@@ -162,6 +169,8 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			// apply comment at this address
 			setPreComment(program, comment, addr);
 		}
+		Msg.info(this, String.format("%s: %d signatures (%d unique) found at %d addresses", getName(), totalSigCount,
+				uniqSigCount, cryptMap.size()));
 
 		return true;
 	}
