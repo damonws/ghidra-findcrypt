@@ -18,6 +18,10 @@ package findcrypt;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import generic.jar.ResourceFile;
 import ghidra.app.services.AbstractAnalyzer;
@@ -31,7 +35,6 @@ import ghidra.program.model.data.ByteDataType;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
-import ghidra.util.InvalidNameException;
 import ghidra.util.Msg;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.InvalidInputException;
@@ -67,7 +70,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			throws CancelledException {
 
 		// If the database hasn't yet been opened, we'll open it
-		monitor.setMessage(super.getName() + ": loading database");
+		monitor.setMessage(getName() + ": loading database");
 		if (this.database == null) {
 			try {
 				this.database = new CryptDatabase();
@@ -82,11 +85,12 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			}
 		}
 
-		// set up monitor for meaningful feedback
+		// search for signatures and add them to a map object
+		Map<Address, Set<CryptSignature>> cryptMap = new HashMap<>();
+		// set up monitor to track which signature we're processing
 		monitor.initialize(database.getNumSignatures());
-		monitor.setMessage(super.getName() + ": identify signatures");
+		monitor.setMessage(getName() + ": identify signatures");
 		for (CryptSignature signature : database.getSignatures()) {
-			monitor.checkCancelled();
 			monitor.incrementProgress();
 
 			// We'll start searching from the top of the newly added address range
@@ -103,64 +107,70 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 					if (search_from == null)
 						break;
 				}
-				Address found_addr = program.getMemory().findBytes(search_from, signature.getBytes(), null, true, null);
-				if (found_addr == null)
+				Address foundAddr = program.getMemory().findBytes(search_from, signature.getBytes(), null, true, null);
+				if (foundAddr == null) {
 					break;
-
-				Msg.info(this, String.format("Labelled %s @ %s - %d bytes", signature.getName(), found_addr.toString(),
-						signature.getBytes().length));
-				try {
-					// Add a symbol
-					program.getSymbolTable().createLabel(found_addr, "CRYPT_" + signature.getName(),
-							SourceType.ANALYSIS);
-
-					// Add a comment
-					addComment(program, signature, found_addr);
-
-					// Try to create an array
-					ArrayDataType dt = new ArrayDataType(new ByteDataType(), signature.getBytes().length, 1);
-					try {
-						dt.setName("CRYPT_" + signature.getName());
-					} catch (InvalidNameException e) {
-						Msg.error(this, "Failed to name datatype " + "CRYPT_" + signature.getName(), e);
-					}
-
-					try {
-						program.getListing().createData(found_addr, dt);
-					} catch (CodeUnitInsertionException e) {
-						// We failed to attach the datatype, this is probably due to existing data
-						// If that's the case, we probably don't want to overwrite it...
-						Msg.warn(this, "Could not apply datatype for crypt constant:" + e.getMessage());
-					}
-
-				} catch (InvalidInputException e) {
-					log.appendException(e);
-					return false;
 				}
 
-				// Now we search from the address after
-				search_from = found_addr.next();
+				// found a signature, add it to the set at this address
+				Set<CryptSignature> sigSet = cryptMap.get(foundAddr);
+				if (sigSet == null) {
+					sigSet = new TreeSet<>();
+					cryptMap.put(foundAddr, sigSet);
+				}
+				sigSet.add(signature);
+
+				// set start point for next search
+				search_from = foundAddr.next();
 			}
+		}
+
+		// apply markup for the signatures that were found
+		// set up monitor to track which address we're marking up
+		monitor.initialize(cryptMap.size());
+		monitor.setMessage(getName() + ": apply signature markup");
+		for (Map.Entry<Address, Set<CryptSignature>> entry : cryptMap.entrySet()) {
+			Address addr = entry.getKey();
+			Set<CryptSignature> sigs = entry.getValue();
+			monitor.incrementProgress();
+			String comment = "";
+			for (CryptSignature sig : sigs) {
+				monitor.checkCancelled();
+				try {
+					// Add a symbol
+					program.getSymbolTable().createLabel(addr, "CRYPT_" + sig.getName(), SourceType.ANALYSIS);
+					Msg.info(this, String.format("Labelled %s @ %s - %d bytes", sig.getName(), addr.toString(),
+							sig.getBytes().length));
+
+					// Add to comment
+					if (comment.length() > 0)
+						comment += System.lineSeparator();
+					comment += String.format("Crypt constant %s - %d bytes", sig.getName(), sig.getBytes().length);
+					if (sig.getComment().length() > 0)
+						comment += System.lineSeparator() + sig.getComment();
+
+					// Try to create an array
+					ArrayDataType dt = new ArrayDataType(new ByteDataType(), sig.getBytes().length, 1);
+					program.getListing().createData(addr, dt);
+				} catch (InvalidInputException e) {
+					Msg.error(this, "signature markup failed", e);
+				} catch (CodeUnitInsertionException e) {
+					// We failed to attach the datatype, this is probably due to existing data
+					Msg.warn(this, "Could not apply datatype for crypt constant:" + e.getMessage());
+				}
+			}
+			// apply comment at this address
+			setPreComment(program, comment, addr);
 		}
 
 		return true;
 	}
 
-	private void addComment(Program program, CryptSignature signature, Address found_addr) {
+	private void setPreComment(Program program, String comment, Address addr) {
 		// use of int for the comment type parameter is deprecated starting with 11.4,
 		// but the new data type, CommentType, isn't available until 11.4, so for builds
-		// with earlier versions we still have to use an int. 1 is a PRE comment.
-		String comment = program.getListing().getComment(1, found_addr);
-		if (comment == null) {
-			comment = "";
-		} else {
-			comment += System.lineSeparator();
-		}
-		comment += String.format("Crypt constant %s - %d bytes", signature.getName(), signature.getBytes().length); 
-		if (signature.getComment().length() > 0) {
-			comment += "\n" + signature.getComment();
-		}
-		program.getListing().setComment(found_addr, 1, comment);
+		// with earlier versions we still have to use an int
+		program.getListing().setComment(addr, 1, comment);
 	}
 
 	@Override
