@@ -1,7 +1,5 @@
 package findcrypt;
 
-import java.util.Arrays;
-
 /**
  * A cryptographic constant we can search for
  *
@@ -12,34 +10,18 @@ public class CryptSignature implements Comparable<CryptSignature> {
 	private final String comment;
 	private final String hexBytes;
 	private transient final byte[] data;
-	private transient final byte[] prefix;
 	private boolean found;
-
-	private static final int PREFIX_SIZE = 8;
 
 	public CryptSignature(String name, String comment, String hexBytes) {
 		this.name = name;
 		this.comment = comment;
 		this.hexBytes = hexBytes;
 		data = hexStringToByteArray(this.hexBytes);
-		if (data.length > PREFIX_SIZE) {
-			prefix = Arrays.copyOfRange(data, 0, PREFIX_SIZE);
-		} else {
-			prefix = null;
-		}
 		found = false;
 	}
 
 	public byte[] getBytes() {
 		return data;
-	}
-
-	public byte[] getPrefixBytes() {
-		return prefix;
-	}
-
-	public boolean isLarge() {
-		return prefix != null;
 	}
 
 	public String getName() {
