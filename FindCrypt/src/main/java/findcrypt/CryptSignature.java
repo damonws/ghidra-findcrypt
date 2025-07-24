@@ -13,6 +13,7 @@ public class CryptSignature implements Comparable<CryptSignature> {
 	private final String hexBytes;
 	private transient final byte[] data;
 	private transient final byte[] prefix;
+	private boolean found;
 
 	private static final int PREFIX_SIZE = 8;
 
@@ -26,6 +27,7 @@ public class CryptSignature implements Comparable<CryptSignature> {
 		} else {
 			prefix = null;
 		}
+		found = false;
 	}
 
 	public byte[] getBytes() {
@@ -56,6 +58,14 @@ public class CryptSignature implements Comparable<CryptSignature> {
 
 	public int getLength() {
 		return data.length;
+	}
+
+	public void setFound() {
+		found = true;
+	}
+
+	public boolean isFound() {
+		return found;
 	}
 
 	private static byte[] hexStringToByteArray(String s) {
