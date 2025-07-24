@@ -18,7 +18,7 @@ public class CryptDatabase {
 	private final ArrayList<CryptSignature> signatures;
 
 	public CryptDatabase() {
-		this.signatures = new ArrayList<>();
+		signatures = new ArrayList<>();
 	}
 
 	public void parse(Reader reader) {
@@ -31,16 +31,25 @@ public class CryptDatabase {
 	}
 
 	public ArrayList<CryptSignature> getSignatures() {
-		return this.signatures;
+		return signatures;
 	}
 
 	public int getNumSignatures() {
-		return this.signatures.size();
+		return signatures.size();
+	}
+
+	public int getNumFound() {
+		int found = 0;
+		for (CryptSignature sig : signatures) {
+			if (sig.isFound())
+				found++;
+		}
+		return found;
 	}
 
 	private void addSignature(String name, String comment, String hexString) {
 		CryptSignature sig = new CryptSignature(name, comment, hexString);
-		this.signatures.add(sig);
+		signatures.add(sig);
 		Msg.debug(this, String.format("Added signature: %s", sig.getName()));
 	}
 }

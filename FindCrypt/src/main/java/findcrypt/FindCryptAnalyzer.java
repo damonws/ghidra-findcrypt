@@ -17,11 +17,17 @@ package findcrypt;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+
+import org.ahocorasick.trie.PayloadEmit;
+import org.ahocorasick.trie.PayloadTrie;
+import org.ahocorasick.trie.PayloadTrie.PayloadTrieBuilder;
 
 import generic.jar.ResourceFile;
 import ghidra.app.services.AbstractAnalyzer;
@@ -29,6 +35,7 @@ import ghidra.app.services.AnalyzerType;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.framework.Application;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressRange;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.ArrayDataType;
 import ghidra.program.model.data.ByteDataType;
@@ -51,7 +58,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 
 	public FindCryptAnalyzer() {
 		super("Find Crypt", "Find common cryptographic constants", AnalyzerType.BYTE_ANALYZER);
-		this.database = null;
+		database = null;
 	}
 
 	@Override
@@ -69,78 +76,58 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 	@Override
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log)
 			throws CancelledException {
-		int uniqSigCount = 0;
 		int totalSigCount = 0;
 
 		// If the database hasn't yet been opened, we'll open it
 		monitor.setMessage(getName() + ": loading database");
-		if (this.database == null) {
+		if (database == null) {
 			try {
-				this.database = new CryptDatabase();
+				database = new CryptDatabase();
 				ResourceFile resourceFile = Application.getModuleFile("FindCrypt", "data/database.json");
 				Msg.info(this, "Loading FindCrypt signature database from file");
 
 				Reader reader = Files.newBufferedReader(resourceFile.getFile(true).toPath());
-				this.database.parse(reader);
+				database.parse(reader);
 			} catch (IOException e) {
 				log.appendException(e);
 				return false;
 			}
 		}
 
-		// search for signatures and add them to a map object
+		// Build Aho-Corasick automaton
+		monitor.setMessage(getName() + ": building automaton");
+		PayloadTrieBuilder<CryptSignature> tb = PayloadTrie.builder();
+		for (CryptSignature sig : database.getSignatures()) {
+			tb.addKeyword(new String(sig.getBytes(), StandardCharsets.ISO_8859_1), sig);
+		}
+		PayloadTrie<CryptSignature> trie = tb.build();
+
+		// Run the automaton on each address range to find signatures, building a map of
+		// what we've found as we go
+		monitor.setMessage(getName() + ": finding signatures");
 		Map<Address, Set<CryptSignature>> cryptMap = new HashMap<>();
-		// set up monitor to track which signature we're processing
-		monitor.initialize(database.getNumSignatures());
-		monitor.setMessage(getName() + ": identify signatures");
-		for (CryptSignature signature : database.getSignatures()) {
-			boolean found = false;
-			monitor.incrementProgress();
-
-			// We'll start searching from the top of the newly added address range
-			Address search_from = set.getMinAddress();
-
-			while (search_from != null) {
-				monitor.checkCancelled();
-
-				// Starting at min_address, find the next occurrence of the bytes from the
-				// signature; for large signatures, start by searching for prefix
-				if (signature.isLarge()) {
-					search_from = program.getMemory().findBytes(search_from, signature.getPrefixBytes(), null, true,
-							null);
-					if (search_from == null)
-						break;
-				}
-				Address foundAddr = program.getMemory().findBytes(search_from, signature.getBytes(), null, true, null);
-				if (foundAddr == null) {
-					break;
-				}
-
-				// found a signature, add it to the set at this address
-				found = true;
+		for (AddressRange range : set.getAddressRanges()) {
+			GhidraMemCharSequence cs = new GhidraMemCharSequence(program.getMemory(), range, log);
+			Collection<PayloadEmit<CryptSignature>> emits = trie.parseText(cs);
+			for (PayloadEmit<CryptSignature> emit : emits) {
+				CryptSignature sig = emit.getPayload();
 				totalSigCount++;
+				sig.setFound();
+				Address foundAddr = range.getMinAddress().add(emit.getStart());
 				Set<CryptSignature> sigSet = cryptMap.get(foundAddr);
 				if (sigSet == null) {
 					sigSet = new TreeSet<>();
 					cryptMap.put(foundAddr, sigSet);
 				}
-				sigSet.add(signature);
-
-				// set start point for next search
-				search_from = foundAddr.next();
+				sigSet.add(sig);
 			}
-			if (found)
-				uniqSigCount++;
 		}
 
 		// apply markup for the signatures that were found
-		// set up monitor to track which address we're marking up
-		monitor.initialize(cryptMap.size());
-		monitor.setMessage(getName() + ": apply signature markup");
+		monitor.setMessage(getName() + ": applying markup");
 		for (Map.Entry<Address, Set<CryptSignature>> entry : cryptMap.entrySet()) {
 			Address addr = entry.getKey();
 			Set<CryptSignature> sigs = entry.getValue();
-			monitor.incrementProgress();
 			String comment = "";
 			for (CryptSignature sig : sigs) {
 				monitor.checkCancelled();
@@ -171,7 +158,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			setPreComment(program, comment, addr);
 		}
 		Msg.info(this, String.format("%s: %d signatures (%d unique) found at %d addresses", getName(), totalSigCount,
-				uniqSigCount, cryptMap.size()));
+				database.getNumFound(), cryptMap.size()));
 
 		return true;
 	}
@@ -184,7 +171,7 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 	@Override
 	public void analysisEnded(Program program) {
 		// Drop the database and end the analysis
-		this.database = null;
+		database = null;
 		super.analysisEnded(program);
 	}
 }
