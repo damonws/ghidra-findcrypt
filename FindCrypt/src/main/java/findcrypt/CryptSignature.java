@@ -1,27 +1,62 @@
 package findcrypt;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+import ghidra.program.model.address.Address;
+
 /**
  * A cryptographic constant we can search for
+ * 
+ * formatted as a hex bytes, with two simple wildcards: - "{N}" : from 0-N bytes
+ * that can by anything - "*" : equivalent to "{16}"
  *
- * @author torgo
+ * Thus, a constant is a collection of one or more hex strings to match, with
+ * variable length gaps between the parts.
  */
 public class CryptSignature implements Comparable<CryptSignature> {
 	private final String name;
 	private final String comment;
 	private final String hexBytes;
-	private transient final byte[] data;
-	private boolean found;
+	private transient List<CryptSignaturePart> parts;
+	private transient int length;
+	private transient boolean everFound;
 
 	public CryptSignature(String name, String comment, String hexBytes) {
 		this.name = name;
 		this.comment = comment;
 		this.hexBytes = hexBytes;
-		data = hexStringToByteArray(this.hexBytes);
-		found = false;
+		parts = new ArrayList<>();
+		length = 0;
+		int gap = 0;
+		int index = 0;
+		for (String s : hexBytes.splitWithDelimiters("(\\{\\d+\\})|\\*", 0)) {
+			if (s.equals("*")) {
+				gap = 16;
+			} else if (s.startsWith("{")) {
+				gap = Integer.parseInt(s.substring(1, s.length() - 1));
+			} else {
+				if (index == 0) {
+					parts.add(new CryptSignaturePart(name, s, this));
+				} else {
+					parts.add(new CryptSignaturePart(name, index, s, gap));
+				}
+				index++;
+				length += s.length();
+			}
+		}
+		everFound = false;
 	}
 
-	public byte[] getBytes() {
-		return data;
+	public boolean isMatched(Address addr) {
+		for (CryptSignaturePart part : parts) {
+			Address partAddr = part.getMatchedAddress(addr);
+			if (partAddr == null)
+				return false;
+			addr = partAddr.add(part.getLength());
+		}
+		return true;
 	}
 
 	public String getName() {
@@ -39,29 +74,41 @@ public class CryptSignature implements Comparable<CryptSignature> {
 	}
 
 	public int getLength() {
-		return data.length;
+		return length;
 	}
 
-	public void setFound() {
-		found = true;
+	public void setEverFound() {
+		everFound = true;
 	}
 
-	public boolean isFound() {
-		return found;
-	}
-
-	private static byte[] hexStringToByteArray(String s) {
-		int len = s.length();
-		byte[] data = new byte[len / 2];
-		for (int i = 0; i < len; i += 2) {
-			data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
-		}
-		return data;
+	public boolean getEverFound() {
+		return everFound;
 	}
 
 	@Override
 	public int compareTo(CryptSignature o) {
-		return o.getLength() - getLength();
+		int diff = o.getLength() - getLength();
+		if (diff != 0)
+			return diff;
+		return name.compareTo(o.getName());
 	}
 
+	public List<CryptSignaturePart> getParts() {
+		return parts;
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		if (o == null || getClass() != o.getClass())
+			return false;
+		CryptSignature other = (CryptSignature) o;
+		return name.equals(other.name);
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(name);
+	}
 }
