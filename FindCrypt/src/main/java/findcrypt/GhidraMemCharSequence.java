@@ -11,13 +11,10 @@ public class GhidraMemCharSequence implements CharSequence {
 
 	private byte[] bytes;
 
-	public GhidraMemCharSequence(Memory mem, AddressRange range, MessageLog log) {
+	public GhidraMemCharSequence(Memory mem, AddressRange range, MessageLog log) throws MemoryAccessException {
+
 		bytes = new byte[(int) range.getLength()];
-		try {
-			mem.getBytes(range.getMinAddress(), bytes);
-		} catch (MemoryAccessException e) {
-			log.appendException(e);
-		}
+		mem.getBytes(range.getMinAddress(), bytes);
 	}
 
 	private GhidraMemCharSequence(byte[] bytes) {

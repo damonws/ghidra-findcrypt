@@ -42,6 +42,7 @@ import ghidra.program.model.data.ArrayDataType;
 import ghidra.program.model.data.ByteDataType;
 import ghidra.program.model.listing.CommentType;
 import ghidra.program.model.listing.Program;
+import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.Msg;
@@ -132,29 +133,33 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 		Map<Address, Set<CryptSignature>> cryptMap = new HashMap<>();
 		for (AddressRange range : set.getAddressRanges()) {
 			monitor.checkCancelled();
-			// wrap memory for this address range in a datatype that Aho-Corasick can search
-			GhidraMemCharSequence cs = new GhidraMemCharSequence(program.getMemory(), range, log);
-			Collection<PayloadEmit<Set<CryptSignaturePart>>> emits = trie.parseText(cs);
-			for (PayloadEmit<Set<CryptSignaturePart>> emit : emits) {
-				// each match is a set of parts from signatures that require this pattern
-				monitor.checkCancelled();
-				Set<CryptSignaturePart> partSet = emit.getPayload();
-				Address foundAddr = range.getMinAddress().add(emit.getStart());
-				// mark each part as found at the address where this pattern was found
-				for (CryptSignaturePart part : partSet) {
-					part.markFoundAtAddress(foundAddr);
-					if (part.getSig() != null) {
-						// this is the first part of a signature -- save it to check whether all parts
-						// matched in the next pass
-						Set<CryptSignature> sigSet = cryptMap.get(foundAddr);
-						if (sigSet == null) {
-							// it's important to use a TreeSet here so the sigs are sorted
-							sigSet = new TreeSet<>();
-							cryptMap.put(foundAddr, sigSet);
+			try {
+				// wrap memory for this address range in a datatype that Aho-Corasick can search
+				GhidraMemCharSequence cs = new GhidraMemCharSequence(program.getMemory(), range, log);
+				Collection<PayloadEmit<Set<CryptSignaturePart>>> emits = trie.parseText(cs);
+				for (PayloadEmit<Set<CryptSignaturePart>> emit : emits) {
+					// each match is a set of parts from signatures that require this pattern
+					monitor.checkCancelled();
+					Set<CryptSignaturePart> partSet = emit.getPayload();
+					Address foundAddr = range.getMinAddress().add(emit.getStart());
+					// mark each part as found at the address where this pattern was found
+					for (CryptSignaturePart part : partSet) {
+						part.markFoundAtAddress(foundAddr);
+						if (part.getSig() != null) {
+							// this is the first part of a signature -- save it to check whether all parts
+							// matched in the next pass
+							Set<CryptSignature> sigSet = cryptMap.get(foundAddr);
+							if (sigSet == null) {
+								// it's important to use a TreeSet here so the sigs are sorted
+								sigSet = new TreeSet<>();
+								cryptMap.put(foundAddr, sigSet);
+							}
+							sigSet.add(part.getSig());
 						}
-						sigSet.add(part.getSig());
 					}
 				}
+			} catch (MemoryAccessException e) {
+				// just skip to next address range if this one is not readable
 			}
 		}
 
