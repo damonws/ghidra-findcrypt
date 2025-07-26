@@ -37,6 +37,7 @@ import ghidra.app.util.importer.MessageLog;
 import ghidra.framework.Application;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressRange;
+import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.ArrayDataType;
 import ghidra.program.model.data.ByteDataType;
@@ -171,7 +172,8 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			String comment = "";
 			for (CryptSignature sig : sigs) {
 				monitor.checkCancelled();
-				if (sig.isMatched(addr)) {
+				AddressSet match = sig.isMatched(addr);
+				if (match != null) {
 					totalSigCount++;
 					sig.setEverFound();
 					try {
@@ -183,9 +185,15 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 						// Add to comment
 						if (comment.length() > 0)
 							comment += System.lineSeparator();
-						comment += String.format("Crypt constant %s - %d bytes", sig.getName(), sig.getLength());
+						comment += String.format("== %s == (%d bytes)", sig.getName(), sig.getLength());
 						if (sig.getComment().length() > 0)
 							comment += System.lineSeparator() + sig.getComment();
+						if (match.getNumAddressRanges() > 1) {
+							for (AddressRange range : match.getAddressRanges()) {
+								comment += String.format("%s  %s: %d byte%s", System.lineSeparator(),
+										range.getMinAddress(), range.getLength(), range.getLength() > 1 ? "s" : "");
+							}
+						}
 
 						// Try to create an array for the first part of the sig
 						ArrayDataType dt = new ArrayDataType(new ByteDataType(), sig.getParts().get(0).getLength(), 1);

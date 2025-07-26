@@ -5,12 +5,13 @@ import java.util.List;
 import java.util.Objects;
 
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressSet;
 
 /**
- * A cryptographic constant we can search for
+ * A cryptographic constant we can search for.
  * 
- * formatted as a hex bytes, with two simple wildcards: - "{N}" : from 0-N bytes
- * that can by anything - "*" : equivalent to "{16}"
+ * formatted as a hex bytes, with two simple wildcards: "{N}" from 0-N bytes
+ * that can by anything and "*" equivalent to "{9}".
  *
  * Thus, a constant is a collection of one or more hex strings to match, with
  * variable length gaps between the parts.
@@ -33,7 +34,7 @@ public class CryptSignature implements Comparable<CryptSignature> {
 		int index = 0;
 		for (String s : hexBytes.splitWithDelimiters("(\\{\\d+\\})|\\*", 0)) {
 			if (s.equals("*")) {
-				gap = 16;
+				gap = 9;
 			} else if (s.startsWith("{")) {
 				gap = Integer.parseInt(s.substring(1, s.length() - 1));
 			} else {
@@ -43,20 +44,24 @@ public class CryptSignature implements Comparable<CryptSignature> {
 					parts.add(new CryptSignaturePart(name, index, s, gap));
 				}
 				index++;
-				length += s.length();
+				length += s.length() / 2;
 			}
 		}
 		everFound = false;
 	}
 
-	public boolean isMatched(Address addr) {
+	// return an AddressSet of the (potentially non-contiguous) addresses containing
+	// the signature match, or null if there is no match
+	public AddressSet isMatched(Address addr) {
+		AddressSet match = new AddressSet();
 		for (CryptSignaturePart part : parts) {
 			Address partAddr = part.getMatchedAddress(addr);
 			if (partAddr == null)
-				return false;
+				return null;
+			match.add(partAddr, partAddr.add(part.getLength() - 1));
 			addr = partAddr.add(part.getLength());
 		}
-		return true;
+		return match;
 	}
 
 	public String getName() {
