@@ -11,8 +11,6 @@ import ghidra.util.Msg;
 /**
  * A simple data structure that deserializes {@link CryptSignature} objects from
  * a file.
- *
- * @author torgo
  */
 public class CryptDatabase {
 	private final ArrayList<CryptSignature> signatures;
@@ -41,7 +39,7 @@ public class CryptDatabase {
 	public int getNumFound() {
 		int found = 0;
 		for (CryptSignature sig : signatures) {
-			if (sig.isFound())
+			if (sig.getEverFound())
 				found++;
 		}
 		return found;

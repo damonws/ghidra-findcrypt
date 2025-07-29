@@ -17,11 +17,12 @@ package findcrypt;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -36,10 +37,12 @@ import ghidra.app.util.importer.MessageLog;
 import ghidra.framework.Application;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressRange;
+import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.ArrayDataType;
 import ghidra.program.model.data.ByteDataType;
 import ghidra.program.model.listing.Program;
+import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.Msg;
@@ -93,36 +96,74 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			}
 		}
 
-		// Build Aho-Corasick automaton
-		monitor.setMessage(getName() + ": building automaton");
-		PayloadTrieBuilder<CryptSignature> tb = PayloadTrie.builder();
+		// Consolidate duplicate signature parts before feeding to Aho-Corasick
+		// also check for duplicate signature names -- subsequent code needs them to be
+		// unique
+		monitor.setMessage(getName() + ": consolidating signatures");
+		Map<String, Set<CryptSignaturePart>> partsMap = new HashMap<>();
+		Set<String> sigNames = new HashSet<>();
 		for (CryptSignature sig : database.getSignatures()) {
-			tb.addKeyword(new String(sig.getBytes(), StandardCharsets.ISO_8859_1), sig);
-		}
-		PayloadTrie<CryptSignature> trie = tb.build();
-
-		// Run the automaton on each address range to find signatures, building a map of
-		// what we've found as we go
-		monitor.setMessage(getName() + ": finding signatures");
-		Map<Address, Set<CryptSignature>> cryptMap = new HashMap<>();
-		for (AddressRange range : set.getAddressRanges()) {
-			GhidraMemCharSequence cs = new GhidraMemCharSequence(program.getMemory(), range, log);
-			Collection<PayloadEmit<CryptSignature>> emits = trie.parseText(cs);
-			for (PayloadEmit<CryptSignature> emit : emits) {
-				CryptSignature sig = emit.getPayload();
-				totalSigCount++;
-				sig.setFound();
-				Address foundAddr = range.getMinAddress().add(emit.getStart());
-				Set<CryptSignature> sigSet = cryptMap.get(foundAddr);
-				if (sigSet == null) {
-					sigSet = new TreeSet<>();
-					cryptMap.put(foundAddr, sigSet);
+			monitor.checkCancelled();
+			if (sigNames.contains(sig.getName())) {
+				log.appendMsg(getName() + " FAILED: duplicate signature name: " + sig.getName());
+				return false;
+			}
+			sigNames.add(sig.getName());
+			for (CryptSignaturePart part : sig.getParts()) {
+				Set<CryptSignaturePart> partSet = partsMap.get(part.getAsStr());
+				if (partSet == null) {
+					partSet = new HashSet<>();
+					partsMap.put(part.getAsStr(), partSet);
 				}
-				sigSet.add(sig);
+				partSet.add(part);
 			}
 		}
 
-		// apply markup for the signatures that were found
+		// Build Aho-Corasick automaton
+		monitor.setMessage(getName() + ": building automaton");
+		PayloadTrieBuilder<Set<CryptSignaturePart>> tb = PayloadTrie.builder();
+		for (Entry<String, Set<CryptSignaturePart>> entry : partsMap.entrySet()) {
+			monitor.checkCancelled();
+			tb.addKeyword(entry.getKey(), entry.getValue());
+		}
+		PayloadTrie<Set<CryptSignaturePart>> trie = tb.build();
+
+		// Run the automaton on each address range to find signature parts
+		monitor.setMessage(getName() + ": finding signature parts");
+		Map<Address, Set<CryptSignature>> cryptMap = new HashMap<>();
+		for (AddressRange range : set.getAddressRanges()) {
+			monitor.checkCancelled();
+			try {
+				// wrap memory for this address range in a datatype that Aho-Corasick can search
+				GhidraMemCharSequence cs = new GhidraMemCharSequence(program.getMemory(), range, log);
+				Collection<PayloadEmit<Set<CryptSignaturePart>>> emits = trie.parseText(cs);
+				for (PayloadEmit<Set<CryptSignaturePart>> emit : emits) {
+					// each match is a set of parts from signatures that require this pattern
+					monitor.checkCancelled();
+					Set<CryptSignaturePart> partSet = emit.getPayload();
+					Address foundAddr = range.getMinAddress().add(emit.getStart());
+					// mark each part as found at the address where this pattern was found
+					for (CryptSignaturePart part : partSet) {
+						part.markFoundAtAddress(foundAddr);
+						if (part.getSig() != null) {
+							// this is the first part of a signature -- save it to check whether all parts
+							// matched in the next pass
+							Set<CryptSignature> sigSet = cryptMap.get(foundAddr);
+							if (sigSet == null) {
+								// it's important to use a TreeSet here so the sigs are sorted
+								sigSet = new TreeSet<>();
+								cryptMap.put(foundAddr, sigSet);
+							}
+							sigSet.add(part.getSig());
+						}
+					}
+				}
+			} catch (MemoryAccessException e) {
+				// just skip to next address range if this one is not readable
+			}
+		}
+
+		// apply markup for the signatures that are matched
 		monitor.setMessage(getName() + ": applying markup");
 		for (Map.Entry<Address, Set<CryptSignature>> entry : cryptMap.entrySet()) {
 			Address addr = entry.getKey();
@@ -130,31 +171,44 @@ public class FindCryptAnalyzer extends AbstractAnalyzer {
 			String comment = "";
 			for (CryptSignature sig : sigs) {
 				monitor.checkCancelled();
-				try {
-					// Add a symbol
-					program.getSymbolTable().createLabel(addr, "CRYPT_" + sig.getName(), SourceType.ANALYSIS);
-					Msg.info(this, String.format("Labelled %s @ %s - %d bytes", sig.getName(), addr.toString(),
-							sig.getBytes().length));
+				AddressSet match = sig.isMatched(addr);
+				if (match != null) {
+					totalSigCount++;
+					sig.setEverFound();
+					try {
+						// Add a symbol
+						program.getSymbolTable().createLabel(addr, "CRYPT_" + sig.getName(), SourceType.ANALYSIS);
+						Msg.info(this, String.format("Labelled %s @ %s - %d bytes", sig.getName(), addr.toString(),
+								sig.getLength()));
 
-					// Add to comment
-					if (comment.length() > 0)
-						comment += System.lineSeparator();
-					comment += String.format("Crypt constant %s - %d bytes", sig.getName(), sig.getBytes().length);
-					if (sig.getComment().length() > 0)
-						comment += System.lineSeparator() + sig.getComment();
+						// Add to comment
+						if (comment.length() > 0)
+							comment += System.lineSeparator();
+						comment += String.format("== %s == (%d bytes)", sig.getName(), sig.getLength());
+						if (sig.getComment().length() > 0)
+							comment += System.lineSeparator() + sig.getComment();
+						if (match.getNumAddressRanges() > 1) {
+							for (AddressRange range : match.getAddressRanges()) {
+								comment += String.format("%s  %s: %d byte%s", System.lineSeparator(),
+										range.getMinAddress(), range.getLength(), range.getLength() > 1 ? "s" : "");
+							}
+						}
 
-					// Try to create an array
-					ArrayDataType dt = new ArrayDataType(new ByteDataType(), sig.getBytes().length, 1);
-					program.getListing().createData(addr, dt);
-				} catch (InvalidInputException e) {
-					Msg.error(this, "signature markup failed", e);
-				} catch (CodeUnitInsertionException e) {
-					// We failed to attach the datatype, this is probably due to existing data
-					Msg.warn(this, "Could not apply datatype for crypt constant:" + e.getMessage());
+						// Try to create an array for the first part of the sig
+						ArrayDataType dt = new ArrayDataType(new ByteDataType(), sig.getParts().get(0).getLength(), 1);
+						program.getListing().createData(addr, dt);
+					} catch (InvalidInputException e) {
+						Msg.error(this, "signature markup failed", e);
+					} catch (CodeUnitInsertionException e) {
+						// We failed to attach the datatype, this is probably due to existing data
+						Msg.warn(this, "Could not apply datatype for crypt constant:" + e.getMessage());
+					}
 				}
 			}
-			// apply comment at this address
-			setPreComment(program, comment, addr);
+			if (comment.length() > 0) {
+				// apply comment at this address
+				setPreComment(program, comment, addr);
+			}
 		}
 		Msg.info(this, String.format("%s: %d signatures (%d unique) found at %d addresses", getName(), totalSigCount,
 				database.getNumFound(), cryptMap.size()));
